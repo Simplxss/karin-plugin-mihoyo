@@ -1,8 +1,9 @@
 import { plugin, segment } from '#Karin'
-import MihoyoAccount from '../lib/database/MihoyoAccount.js'
 import passport from '../lib/apis/passport.js'
 import hk4e from '../lib/apis/hk4e.js'
-import delay from 'lodash'
+import { sleep } from '../lib/utils.js'
+import User from '../lib/database/User.js'
+import MihoyoAccount from '../lib/database/MihoyoAccount.js'
 import QRCode from 'qrcode'
 
 export class login extends plugin {
@@ -19,19 +20,19 @@ export class login extends plugin {
       // 以下rule、task、button、handler均为可选，如键入，则必须为数组
       rule: [
         {
-          reg: `^账号(.*)密码(.*)$`,
+          reg: `^密码登录(.*) (.*)$`,
           fnc: "passwordLogin",
           log: false,
           permission: 'all'
         },
         {
-          reg: String.raw`^手机号登录(\+\d*)? ?(\d*)$`,
+          reg: String.raw`^短信验证码登录(\+\d*)? ?(\d*)$`,
           fnc: "phoneLogin",
           log: false,
           permission: 'all'
         },
         {
-          reg: String.raw`^手机号登录(\+\d*)? ?(\d*) (\d{6})$`,
+          reg: String.raw`^短信验证码登录(\+\d*)? ?(\d*) (\d{6})$`,
           fnc: "submmitSmsCode",
           log: false,
           permission: 'all'
@@ -47,17 +48,69 @@ export class login extends plugin {
           fnc: "loginHelp",
           log: false,
           permission: 'all'
-        }
-      ],
-      button: [
+        },
         {
-          // 必选 按钮命令正则
-          reg: '测试按钮',
-          // 必选 按钮执行方法
-          fnc: 'buttonTest'
+          reg: `^test$`,
+          fnc: "test",
+          log: false,
+          permission: 'all'
         }
       ]
     })
+  }
+
+  async test () {
+  }
+
+  async passwordLogin () {
+    try {
+      let params = /^密码登录(.*) (.*)$/.exec(this.e.msg)
+      let res = await passport.loginByPassword(params[1], params[2])
+
+      let mihoyoAccount = new MihoyoAccount('miyoushe', res.account_id)
+      await mihoyoAccount.createByStoken(res.stoken, res.mid)
+      await mihoyoAccount.save()
+
+      let user = new User(this.e.user_id)
+      await user.addMihoyoAccount(mihoyoAccount)
+      await user.save()
+
+      this.reply('登录成功', { at: true, recallMsg: 0, reply: false, button: false })
+    }
+    catch (err) {
+      this.reply(err.message, { at: false, recallMsg: 0, reply: true, button: false })
+    }
+  }
+
+  async phoneLogin () {
+    try {
+      let params = /^短信验证码登录(\+\d*)? ?(\d*)$/.exec(this.e.msg)
+      await passport.sendSms(params[1] ? params[1] : '+86', params[2])
+      this.reply('验证码已发送，请输入验证码', { at: false, recallMsg: 0, reply: true, button: false })
+    }
+    catch (err) {
+      this.reply(err.message, { at: false, recallMsg: 0, reply: true, button: false })
+    }
+  }
+
+  async submmitSmsCode () {
+    try {
+      let params = /^短信验证码登录(\+\d*)? ?(\d*) (\d{6})$/.exec(this.e.msg)
+      let res = await passport.verifySmsCode(params[1] ? params[1] : '+86', params[2], params[3])
+
+      let mihoyoAccount = new MihoyoAccount('miyoushe', res.account_id)
+      await mihoyoAccount.createByStoken(res.stoken, res.mid)
+      await mihoyoAccount.save()
+
+      let user = new User(this.e.user_id)
+      await user.addMihoyoAccount(mihoyoAccount)
+      await user.save()
+
+      this.reply('登录成功', { at: false, recallMsg: 0, reply: true, button: false })
+    }
+    catch (err) {
+      this.reply(err.message, { at: false, recallMsg: 0, reply: true, button: false })
+    }
   }
 
   async qrcodeLogin () {
@@ -75,56 +128,20 @@ export class login extends plugin {
           this.reply('二维码已扫描, 请确认登录', { at: false, recallMsg: 0, reply: true, button: false })
           hasSend = true
         } else if (res.status === 'Confirmed') {
-          let raw = JSON.parse(res.payload.raw)
-          let mihoyoAccount = new MihoyoAccount()
-          mihoyoAccount.createByGameToken(raw.uid, raw.token)
-          mihoyoAccount.save()
+          let raw = JSON.parse(res.raw)
+          let mihoyoAccount = new MihoyoAccount('miyoushe', raw.uid)
+          await mihoyoAccount.createByGameToken(raw.token)
+          await mihoyoAccount.save()
 
+          let user = new User(this.e.user_id)
+          await user.addMihoyoAccount(mihoyoAccount)
+          await user.save()
 
           this.reply('登录成功', { at: true, recallMsg: 0, reply: false, button: false })
           break
         }
-        await delay(1000)
+        await sleep(1000)
       }
-    }
-    catch (err) {
-      this.reply(err.message, { at: false, recallMsg: 0, reply: true, button: false })
-    }
-  }
-
-  async phoneLogin () {
-    try {
-      let params = /^手机号登录(\+\d*)? ?(\d*)$/.exec(this.e.msg)
-      await passport.sendSms(params[1] ? params[1] : '+86', params[2])
-      this.reply('验证码已发送，请输入验证码', { at: false, recallMsg: 0, reply: true, button: false })
-    }
-    catch (err) {
-      this.reply(err.message, { at: false, recallMsg: 0, reply: true, button: false })
-    }
-  }
-
-  async submmitSmsCode () {
-    try {
-      let params = /^手机号登录(\+\d*)? ?(\d*) (\d{6})$/.exec(this.e.msg)
-      let res = await passport.verifySmsCode(params[1] ? params[1] : '+86', params[2], params[3])
-
-
-
-      this.reply('登录成功', { at: false, recallMsg: 0, reply: true, button: false })
-    }
-    catch (err) {
-      this.reply(err.message, { at: false, recallMsg: 0, reply: true, button: false })
-    }
-  }
-
-  async passwordLogin () {
-    try {
-      let params = /^账号(.*)密码(.*)$/.exec(this.e.msg)
-      let res = await passport.loginByPassword(params[1], params[2])
-
-
-
-      this.reply('登录成功', { at: true, recallMsg: 0, reply: false, button: false })
     }
     catch (err) {
       this.reply(err.message, { at: false, recallMsg: 0, reply: true, button: false })

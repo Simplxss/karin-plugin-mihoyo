@@ -1,29 +1,17 @@
-[Karin](https://github.com/karinjs/karin) 插件包模板仓库
+# karin-plugin-mihoyo
 
----
+米哈游功能基础支持框架
 
-- fork 本仓库
-- 拉取fork后的仓库到本地
-- 修改 `package.json` 文件中的 `name` 和 `description` 字段
-- 将 `README.md` 文件中的内容替换为自己的插件说明。
+# 支持功能
 
-## 克隆仓库
+## 米游社基础功能
+- [x] 密码登录
+- [x] 短信验证码登录
+- [x] 扫码登录
 
-karin根目录执行以下命令克隆仓库到本地
+# 致谢
 
-```bash
-git clone https://github.com/karinjs/karin-plugin-template.git ./plugins/karin-plugin-template
-```
-
-## 安装依赖
-
-```bash
-pnpm install --filter=karin-plugin-template
-```
-
-
-## 开发调试
-
-```bash
-node . --dev
-```
+- [Karin](https://github.com/KarinJS/Karin) 机器人框架
+- [Miao-Yunzai](https://github.com/yoimiya-kokomi/Miao-Yunzai) 借鉴部分处理逻辑
+- [miao-plugin](https://github.com/yoimiya-kokomi/miao-plugin) 借鉴部分处理逻辑
+- [xiaoyao-cvs-plugin](https://github.com/ctrlcvs/xiaoyao-cvs-plugin) 借鉴部分处理逻辑
